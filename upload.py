@@ -3,9 +3,9 @@
 import cherrypy
 import cgi
 import tempfile
-import os
+import memcache
 
-
+mc = memcache.Client(['127.0.0.1:11211'])
 
 class myFieldStorage(cgi.FieldStorage):
 
@@ -20,8 +20,8 @@ def noBodyProcess():
 cherrypy.tools.noBodyProcess = cherrypy.Tool('before_request_body', noBodyProcess)
 
 
-class fileUpload:
-
+class fileUpload:    
+        
     @cherrypy.expose
     def index(self):
 
@@ -59,9 +59,15 @@ class fileUpload:
     def getImg(self,fileName=None):
         if fileName == None:
             return ""
-        imgFile = open(fileName,"rb")
+        #mc.set("hello","world")
+        #print mc.get("hello")
+        content = mc.get(fileName.encode("utf-8"))
+        if  content == None:
+            imgFile = open(fileName,"rb")
+            content = imgFile.read()
+            mc.set(fileName.encode("utf-8"),content)
         cherrypy.response.headers['Content-Type'] = "image/png"
-        return imgFile.read()
+        return content
 
 
 cherrypy.server.max_request_body_size = 0
