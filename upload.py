@@ -10,20 +10,14 @@ import os
 mc = memcache.Client(['127.0.0.1:11211'])
 imgroot = "img"
 class myFieldStorage(cgi.FieldStorage):
-        
+    
     def make_file(self, binary=None):
-        paths_list = self.headers['stored_file_path'].split("/")
-        dirname = "/".join([imgroot,paths_list[0],paths_list[1],paths_list[2]]);
-        if not os.path.exists(dirname):
-            os.makedirs(dirname);
-        return open(imgroot+"/"+self.headers['stored_file_path'], 'w+b')
-
+        return tempfile.NamedTemporaryFile()
 
 def noBodyProcess():
     cherrypy.request.process_request_body = False
 
 cherrypy.tools.noBodyProcess = cherrypy.Tool('before_request_body', noBodyProcess)
-
 
 class fileUpload:    
         
@@ -52,14 +46,17 @@ class fileUpload:
             
         uid = uuid.uuid4();
         stored_path = '/'.join([uid.hex[0:3], uid.hex[4:6], uid.hex[7:9],uid.hex[10:]]);
-        lcHDRS["stored_file_path"] = stored_path
+        dirname = "/".join([imgroot,uid.hex[0:3], uid.hex[4:6], uid.hex[7:9]]);
+        if not os.path.exists(dirname):
+            os.makedirs(dirname);
         formFields = myFieldStorage(fp=cherrypy.request.rfile,
                                     headers=lcHDRS,
                                     environ={'REQUEST_METHOD':'POST'},
                                     keep_blank_values=True)
 
         theFile = formFields['theFile']
-        #os.link(theFile.file.name, theFile.filename)
+        realfile = open(imgroot+"/"+stored_path,"w+b")
+        realfile.write(theFile.file.read());
 
         return "%s" % stored_path
 
