@@ -74,9 +74,9 @@ class fileUpload:
         cherrypy.response.headers['Content-Type'] = "image"
         return content
 
+def application(environ, start_response):
+    cherrypy.server.max_request_body_size = 0
+    cherrypy.server.socket_timeout = 60
+    cherrypy.tree.mount(fileUpload(), '/', None)
+    return cherrypy.tree(environ, start_response)
 
-cherrypy.server.max_request_body_size = 0
-
-cherrypy.server.socket_timeout = 60
-
-cherrypy.quickstart(fileUpload())
