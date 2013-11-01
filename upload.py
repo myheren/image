@@ -44,33 +44,52 @@ class fileUpload:
         for key, val in cherrypy.request.headers.iteritems():
             lcHDRS[key.lower()] = val
             
-        uid = uuid.uuid4();
-        stored_path = '/'.join([uid.hex[0:3], uid.hex[4:6], uid.hex[7:9],uid.hex[10:]]);
-        dirname = "/".join([imgroot,uid.hex[0:3], uid.hex[4:6], uid.hex[7:9]]);
-        if not os.path.exists(dirname):
-            os.makedirs(dirname);
         formFields = myFieldStorage(fp=cherrypy.request.rfile,
                                     headers=lcHDRS,
                                     environ={'REQUEST_METHOD':'POST'},
                                     keep_blank_values=True)
 
         theFile = formFields['theFile']
-        realfile = open(imgroot+"/"+stored_path,"w+b")
+        namelist = theFile.filename.split('.')
+        suffix = namelist[len(namelist)-1]
+        if suffix == '':
+            suffix = 'none'
+        
+        uid = uuid.uuid4();
+        stored_path = '/'.join([imgroot,suffix,uid.hex[0:3], uid.hex[4:6], uid.hex[7:9],uid.hex[10:]]);
+        dirname = "/".join([imgroot,suffix,uid.hex[0:3], uid.hex[4:6], uid.hex[7:9]]);
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+        
+        realpath = stored_path
+        if suffix != 'none':
+            realpath = stored_path+'.'+suffix
+            
+        realfile = open(realpath,"w+b")
         realfile.write(theFile.file.read());
 
-        return "%s" % stored_path
+        return "%s" % uid.hex+'_'+suffix
 
     @cherrypy.expose
-    def getImg(self,fileName=None):
-        if fileName == None:
-            return ""
+    def getImg(self,fileId=None):
+        if fileId == None:
+            return "no file id"
         #mc.set("hello","world")
         #print mc.get("hello")
-        content = mc.get(fileName.encode("utf-8"))
+        filenamelists = fileId.split('_')
+        if len(filenamelists) != 2:
+            return "invalid file id"
+        filename = filenamelists[0]
+        suffix = filenamelists[1]
+        realpath = '/'.join([imgroot,suffix,filename[0:3], filename[4:6], filename[7:9],filename[10:]])
+        if suffix != 'none':
+            realpath = realpath+'.'+suffix
+        
+        content = mc.get(fileId.encode("utf-8"))
         if  content == None:
-            imgFile = open(imgroot+"/"+fileName,"rb")
+            imgFile = open(realpath,"rb")
             content = imgFile.read()
-            mc.set(fileName.encode("utf-8"),content)
+            mc.set(fileId.encode("utf-8"),content)
         cherrypy.response.headers['Content-Type'] = "image"
         return content
 
