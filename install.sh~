@@ -1,0 +1,190 @@
+#!/bin/bash
+#only for ubuntu & please make sure current work dir is "imgCache/deploy"
+echo -----------------------------------------
+echo check system is ubuntu and make sure current work dir is "imgCache"
+echo ----------------------------------------
+echo -----------------------------------------
+echo check for essential packages
+echo ----------------------------------------
+if [ ! -f CherryPy-3.2.2.tar.gz ] 
+then { 
+   echo "miss CherryPy-3.2.2.tar.gz"
+   exit 0
+	 } 
+fi
+
+if [ ! -f red5.zip ] 
+then { 
+   echo "miss red5.zip"
+   exit 0
+   } 
+fi
+
+if [ ! -f flvmeta-1.1.0.tar.gz ] 
+then { 
+   echo "miss flvmeta-1.1.0.tar.gz"
+   exit 0
+	 } 
+fi
+echo -----------------------------------------
+echo change windows symbol
+echo ----------------------------------------
+sh dos2ux.sh
+cd ..
+sh deploy/dos2ux.sh
+cd daemon
+sh ../deploy/dos2ux.sh
+cd ../deploy
+
+echo --------------------------------------------
+echo input IPaddress
+echo -------------------------------------------
+echo -e "Please enter the host IP address:"
+read IPaddress
+
+echo --------------------------------------------
+echo install make
+echo -------------------------------------------
+yum -y install make
+
+echo --------------------------------------------
+echo install unzip
+echo -------------------------------------------
+yum -y install unzip
+
+echo --------------------------------------------
+echo install gcc,glibc
+echo -------------------------------------------
+yum -y install gcc
+yum -y install glibc
+
+echo --------------------------------------------
+echo install java
+echo -------------------------------------------
+yum -y install java-1.6.0-openjdk
+
+echo --------------------------------------------
+echo install apache
+echo -------------------------------------------
+yum -y install httpd
+cp -f httpd.conf /etc/httpd/conf/
+cp -r ../web /var/www/
+chmod 777 -R /var/www/web
+
+echo --------------------------------------------
+echo install php
+echo -------------------------------------------
+yum -y install php
+
+echo --------------------------------------------
+echo install mysql
+echo -------------------------------------------
+yum -y install mysql
+yum -y install mysql-server
+/etc/init.d/mysqld start
+echo set the password=1234 for root
+mysqladmin -uroot password '1234'
+mysql -u root -p1234 <createdb.sql
+
+echo --------------------------------------------
+echo install mysql for python
+echo -------------------------------------------
+yum -y install MySQL-python
+
+#echo -------------alternative--------------------
+#echo install mysql for php
+#echo -------------------------------------------
+#yum -y install php-mysql
+
+echo --------------------------------------------
+echo install ffmpeg
+echo -------------------------------------------
+unzip ../transcoding/ffmpeg.zip -d ../transcoding/
+cp -rf ../transcoding/ffmpeg/bin /usr/local
+cp -rf ../transcoding/ffmpeg/include /usr/local
+cp -rf ../transcoding/ffmpeg/lib /usr/local
+cp -rf ../transcoding/ffmpeg/share /usr/local
+chmod 777 -R /usr/local/bin
+
+echo --------------------------------------------
+echo install cherrypy
+echo -------------------------------------------
+tar xvzf CherryPy-3.2.2.tar.gz
+cd CherryPy-3.2.2
+python setup.py build
+python setup.py install
+cd ..
+
+echo --------------------------------------------
+echo install flvmeta-1.1.0.tar.gz
+echo -------------------------------------------
+tar xvzf flvmeta-1.1.0.tar.gz
+cd flvmeta-1.1.0
+chmod a+x ./configure
+./configure
+make
+make install
+cd ..
+
+echo --------------------------------------------
+echo install red5
+echo -------------------------------------------
+
+mkdir /root/red5
+unzip red5.zip -d /root/red5
+
+echo --------------------------------------------
+echo build the execute path
+echo -------------------------------------------
+cp ../video.py /root/
+cp ../deal_time.py /root/
+#cp startrecord.sh /root/
+#cp ../daemon/recordtask.py /root/
+cp ../daemon/ex.py /root/
+cp ../transcoding/ffmpeg/closeff /root
+cp ../transcoding/ffmpeg/upload /root
+chmod 777 /root/closeff
+chmod 777 /root/upload
+mkdir /var/www/web/v
+echo --------------------------------------------
+echo set rc.local for rebooting
+echo -------------------------------------------
+cp -f rc.local /etc/rc.local
+chmod 777 -R /usr/share/
+
+echo ----------------------------
+echo configure iptables
+echo ----------------------------
+/sbin/iptables -I INPUT -p tcp --dport 8081 -j ACCEPT
+/sbin/iptables -I INPUT -p tcp --dport 8082 -j ACCEPT
+/sbin/iptables -I INPUT -p tcp --dport 1935 -j ACCEPT
+/etc/rc.d/init.d/iptables save
+service iptables save 
+service iptables restart
+
+echo ----------------------------
+echo configure setenforce
+echo ----------------------------
+setenforce 0
+#yum -y install policycoreutils-python
+#semanage port -a -t http_port_t -p tcp 8081
+
+echo ---------------------------------------------
+echo Adjust the Hostaddress configuration
+echo ---------------------------------------------
+sed -i "/var hostaddress/c\
+var hostaddress = '$IPaddress';" /var/www/web/js/video_source_editrow.js
+sed -i "/var hostaddress/c\
+var hostaddress = '$IPaddress';" /var/www/web/videosource.html
+#another way
+#cp mysqld /etc/init.d/
+#chkconfig --add mysqld
+
+echo ---------------------------------------------
+echo Start the whole system
+echo ---------------------------------------------
+#sh /etc/rc.local<<<some error in start mysql twice
+
+#cp ../daemon/icu_server.py /root/
+reboot
+
