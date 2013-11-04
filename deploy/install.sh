@@ -48,9 +48,12 @@ then {
    exit 0
    } 
 fi
-
-#apt-get update
+echo --------------------------------------------
+echo setup environment with python-dev
+echo --------------------------------------------
+apt-get update
 apt-get -y install python-dev
+
 echo --------------------------------------------
 echo install setuptools-1.1.7
 echo -------------------------------------------
@@ -123,6 +126,12 @@ cp -f rc.local /etc/rc.local
 apt-get -y install chkconfig
 chkconfig --add nginx
 chkconfig nginx on
+
+echo --------------------------------------------
+echo optional: install test env with ruby
+echo --------------------------------------------
+#apt-get install curl libcurl3 libcurl3-gnutls libcurl4-openssl-dev
+#gem install curb
 
 echo ---------------------------------------------
 echo Start the whole system
