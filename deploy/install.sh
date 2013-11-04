@@ -49,6 +49,8 @@ then {
    } 
 fi
 
+#apt-get update
+apt-get -y install python-dev
 echo --------------------------------------------
 echo install setuptools-1.1.7
 echo -------------------------------------------
@@ -100,7 +102,7 @@ cd ..
 echo --------------------------------------------
 echo install nginx
 echo -------------------------------------------
-apt-get install nginx
+apt-get -y install nginx
 mkdir /root/web
 sed -i "/root/c\
 root /root/web;" default
@@ -112,18 +114,20 @@ echo --------------------------------------------
 echo build the execute path
 echo -------------------------------------------
 cp -f ../upload.py /root
-uwsgi --http :8000 --wsgi-file /root/upload.py
+uwsgi --http :8000 --wsgi-file /root/upload.py &
 
 echo --------------------------------------------
 echo set rc.local for rebooting
 echo -------------------------------------------
 cp -f rc.local /etc/rc.local
-apt-get install chkconfig
+apt-get -y install chkconfig
 chkconfig --add nginx
 chkconfig nginx on
 
 echo ---------------------------------------------
 echo Start the whole system
 echo ---------------------------------------------
+echo press any key to reboot
+read prop
 reboot
 

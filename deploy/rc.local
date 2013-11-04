@@ -11,6 +11,4 @@
 #
 # By default this script does nothing.
 /usr/local/bin/memcached -d -m 10 -u root -p 11211 -c 256 -P memcached.pid
-uwsgi --http :8000 --wsgi-file /root/upload.py
-
-exit 0
+nohup /usr/local/bin/uwsgi --http :8000 --wsgi-file /root/upload.py &

@@ -1,6 +1,6 @@
 server {
 
-        root /home/fitark/Desktop/web;
+root /root/web;
         index index.html index.htm;
 
         server_name hmp;
