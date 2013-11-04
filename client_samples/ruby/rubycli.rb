@@ -10,4 +10,4 @@ c.multipart_form_post = true
 c.http_post(Curl::PostField.file('theFile', 'files/a.png'))
 
 # print response
-print [c.response_code, c.body_str]
+print c.body_str

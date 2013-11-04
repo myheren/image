@@ -68,7 +68,7 @@ class fileUpload:
         realfile = open(realpath,"w+b")
         realfile.write(theFile.file.read());
 
-        return "%s" % uid.hex+'_'+suffix
+        return "%s" % uid.hex+'.'+suffix
 
     @cherrypy.expose
     def getImg(self,fileId=None):
@@ -76,7 +76,7 @@ class fileUpload:
             return "no file id"
         #mc.set("hello","world")
         #print mc.get("hello")
-        filenamelists = fileId.split('_')
+        filenamelists = fileId.split('.')
         if len(filenamelists) != 2:
             return "invalid file id"
         filename = filenamelists[0]
@@ -100,7 +100,7 @@ class files(object):
             return "no file id"
         #mc.set("hello","world")
         #print mc.get("hello")
-        filenamelists = fileId.split('_')
+        filenamelists = fileId.split('.')
         if len(filenamelists) != 2:
             return "invalid file id"
         filename = filenamelists[0]
@@ -149,7 +149,7 @@ class files(object):
         realfile = open(realpath,"w+b")
         realfile.write(theFile.file.read());
 
-        return "%s" % uid.hex+'_'+suffix
+        return "%s" % uid.hex+'.'+suffix
     
 def application(environ, start_response):
     cherrypy.server.max_request_body_size = 0

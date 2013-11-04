@@ -109,7 +109,7 @@ apt-get -y install nginx
 mkdir /root/web
 sed -i "/root/c\
 root /root/web;" default
-cp -f default /etc/nginx/sites-available
+cp -f default /etc/nginx/sites-enabled
 service nginx restart
 
 
