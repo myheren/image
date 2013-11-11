@@ -21,7 +21,7 @@ def noBodyProcess():
 cherrypy.tools.noBodyProcess = cherrypy.Tool('before_request_body', noBodyProcess)
 
 class fileUpload:    
-        
+    
     @cherrypy.expose
     def index(self):
 
@@ -85,6 +85,7 @@ class fileUpload:
         if fid == None:
             return "no file id"
         try: 
+            print cherrypy.session[fid]
             tempfilepath, length = cherrypy.session[fid] 
         except: # is None or unpack error 
             return 'done' 
@@ -143,7 +144,7 @@ class files(object):
         return content
    
     @cherrypy.tools.noBodyProcess()
-    def POST(self,FileId=None):
+    def POST(self):
         cherrypy.response.timeout = 3600
 
         
@@ -191,11 +192,18 @@ def application(environ, start_response):
     restful_conf = {
                     '/': {
                           'request.dispatch':cherrypy.dispatch.MethodDispatcher(),
-                          'tools.sessions.on':True
+                          'tools.sessions.on':True,
+                          #'tools.sessions.storage_type':"file",
+                          #'tools.sessions.storage_path':"sessions",
+                          #'tools.sessions.timeout': 60
                          },
     }
     cherrypy.tree.mount(files(), '/files', config=restful_conf)
-    cherrypy.tree.mount(fileUpload(), '/', config = {"/": {'tools.sessions.on':True}})
+    cherrypy.tree.mount(fileUpload(), '/', config = {"/": {'tools.sessions.on':True,
+                                                           #'tools.sessions.storage_type':"file",
+                                                           #'tools.sessions.storage_path':"sessions",
+                                                           #'tools.sessions.timeout': 60
+                                                           }})
     return cherrypy.tree(environ, start_response)
 
 server = wsgiserver.CherryPyWSGIServer(('localhost', 8000), application)
