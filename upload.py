@@ -65,8 +65,9 @@ class fileUpload:
         if suffix != 'none':
             realpath = stored_path+'.'+suffix
             
-        realfile = open(realpath,"w+b")
-        realfile.write(theFile.file.read());
+        #realfile = open(realpath,"w+b")
+        #realfile.write(theFile.file.read());
+        os.link(theFile.file.name, realpath)
 
         return "%s" % uid.hex+'.'+suffix
 
@@ -146,8 +147,9 @@ class files(object):
         if suffix != 'none':
             realpath = stored_path+'.'+suffix
             
-        realfile = open(realpath,"w+b")
-        realfile.write(theFile.file.read());
+        #realfile = open(realpath,"w+b")
+        #realfile.write(theFile.file.read());
+        os.link(theFile.file.name, realpath)
 
         return "%s" % uid.hex+'.'+suffix
     
@@ -159,6 +161,7 @@ def application(environ, start_response):
                           'request.dispatch':cherrypy.dispatch.MethodDispatcher(),
                          },
     }
-    cherrypy.tree.mount(files(), '/files', config=restful_conf)
+    #cherrypy.tree.mount(files(), '/files', config=restful_conf)
+    cherrypy.tree.mount(fileUpload(), '/', None)
     return cherrypy.tree(environ, start_response)
 
