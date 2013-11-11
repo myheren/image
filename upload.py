@@ -10,10 +10,14 @@ from cherrypy import wsgiserver
 
 mc = memcache.Client(['127.0.0.1:11211'])
 imgroot = "img"
+fileUploading = {}
 class myFieldStorage(cgi.FieldStorage):
     
     def make_file(self, binary=None):
-        return tempfile.NamedTemporaryFile()
+        tmpfile = tempfile.NamedTemporaryFile()
+        FileId = cherrypy.request.headers['FileId']
+        fileUploading[FileId] = (tmpfile.name, int(cherrypy.request.headers['Content-length'])) 
+        return tmpfile
 
 def noBodyProcess():
     cherrypy.request.process_request_body = False
@@ -46,16 +50,14 @@ class fileUpload:
         lcHDRS = {}
         for key, val in cherrypy.request.headers.iteritems():
             lcHDRS[key.lower()] = val
-            
+               
         formFields = myFieldStorage(fp=cherrypy.request.rfile,
                                     headers=lcHDRS,
                                     environ={'REQUEST_METHOD':'POST'},
                                     keep_blank_values=True)
-
+        FileId = cherrypy.request.headers['FileId']
+         
         theFile = formFields['theFile']
-        FileId = formFields['FileId'].value
-        cherrypy.session[FileId] = (theFile.file.name, cherrypy.request.headers['Content-length']) 
-        cherrypy.session.save() 
         namelist = theFile.filename.split('.')
         suffix = namelist[len(namelist)-1]
         if suffix == '':
@@ -81,19 +83,21 @@ class fileUpload:
 
         return "%s" % FileId+'.'+suffix
     @cherrypy.expose
-    def _status(self, fid=None): 
+    def uploadingStatus(self, fid=None): 
         if fid == None:
             return "no file id"
         try: 
-            print cherrypy.session[fid]
-            tempfilepath, length = cherrypy.session[fid] 
+            tempfilepath, length = fileUploading[fid] 
         except: # is None or unpack error 
-            return 'done' 
+            return 'no such file uploading' 
         else: 
-            currsize = os.stat(tempfilepath).st_size 
-            return float(currsize) / length * 100 # float is just for python2 
+            try:
+                currsize = os.stat(tempfilepath).st_size 
+            except:
+                return "done"
+            return str(float(currsize) / length * 100) + '%' 
    
-    @cherrypy.expose
+    #@cherrypy.expose
     def getImg(self,fileId=None):
         if fileId == None:
             return "no file id"
@@ -158,9 +162,7 @@ class files(object):
                                     keep_blank_values=True)
 
         theFile = formFields['theFile']
-        FileId = formFields['FileId'].value
-        cherrypy.session[FileId] = (theFile.file.name, cherrypy.request.headers['Content-length']) 
-        cherrypy.session.save() 
+        FileId = cherrypy.request.headers['FileId']
         namelist = theFile.filename.split('.')
         suffix = namelist[len(namelist)-1]
         if suffix == '':
@@ -192,14 +194,14 @@ def application(environ, start_response):
     restful_conf = {
                     '/': {
                           'request.dispatch':cherrypy.dispatch.MethodDispatcher(),
-                          'tools.sessions.on':True,
+                          #'tools.sessions.on':True,
                           #'tools.sessions.storage_type':"file",
                           #'tools.sessions.storage_path':"sessions",
                           #'tools.sessions.timeout': 60
                          },
     }
     cherrypy.tree.mount(files(), '/files', config=restful_conf)
-    cherrypy.tree.mount(fileUpload(), '/', config = {"/": {'tools.sessions.on':True,
+    cherrypy.tree.mount(fileUpload(), '/', config = {"/": {#'tools.sessions.on':True,
                                                            #'tools.sessions.storage_type':"file",
                                                            #'tools.sessions.storage_path':"sessions",
                                                            #'tools.sessions.timeout': 60
