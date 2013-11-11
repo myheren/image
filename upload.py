@@ -6,6 +6,7 @@ import tempfile
 import memcache
 import uuid
 import os
+from cherrypy import wsgiserver
 
 mc = memcache.Client(['127.0.0.1:11211'])
 imgroot = "img"
@@ -28,6 +29,7 @@ class fileUpload:
             <html>
             <body>
                 <form action="upload" method="post" enctype="multipart/form-data">
+                    FileId: <input type="text" name="FileId"/> <br/>
                     File: <input type="file" name="theFile"/> <br/>
                     <input type="submit"/>
                 </form>
@@ -37,9 +39,10 @@ class fileUpload:
 
     @cherrypy.expose
     @cherrypy.tools.noBodyProcess()
-    def upload(self, theFile=None):
+    def upload(self):
         cherrypy.response.timeout = 3600
 
+        
         lcHDRS = {}
         for key, val in cherrypy.request.headers.iteritems():
             lcHDRS[key.lower()] = val
@@ -50,14 +53,21 @@ class fileUpload:
                                     keep_blank_values=True)
 
         theFile = formFields['theFile']
+        FileId = formFields['FileId'].value
+        cherrypy.session[FileId] = (theFile.file.name, cherrypy.request.headers['Content-length']) 
+        cherrypy.session.save() 
         namelist = theFile.filename.split('.')
         suffix = namelist[len(namelist)-1]
         if suffix == '':
             suffix = 'none'
-        
-        uid = uuid.uuid4();
-        stored_path = '/'.join([imgroot,suffix,uid.hex[0:3], uid.hex[4:6], uid.hex[7:9],uid.hex[10:]]);
-        dirname = "/".join([imgroot,suffix,uid.hex[0:3], uid.hex[4:6], uid.hex[7:9]]);
+            
+        if FileId == None:
+            uid = uuid.uuid4();
+            FileId = uid.hex;
+                        
+        stored_path = '/'.join([imgroot,suffix,FileId[0:3], FileId[4:6], FileId[7:9],FileId[10:]]);
+        dirname = "/".join([imgroot,suffix,FileId[0:3], FileId[4:6], FileId[7:9]]);
+            
         if not os.path.exists(dirname):
             os.makedirs(dirname)
         
@@ -69,8 +79,19 @@ class fileUpload:
         #realfile.write(theFile.file.read());
         os.link(theFile.file.name, realpath)
 
-        return "%s" % uid.hex+'.'+suffix
-
+        return "%s" % FileId+'.'+suffix
+    @cherrypy.expose
+    def _status(self, fid=None): 
+        if fid == None:
+            return "no file id"
+        try: 
+            tempfilepath, length = cherrypy.session[fid] 
+        except: # is None or unpack error 
+            return 'done' 
+        else: 
+            currsize = os.stat(tempfilepath).st_size 
+            return float(currsize) / length * 100 # float is just for python2 
+   
     @cherrypy.expose
     def getImg(self,fileId=None):
         if fileId == None:
@@ -112,16 +133,20 @@ class files(object):
         
         content = mc.get(fileId.encode("utf-8"))
         if  content == None:
-            imgFile = open(realpath,"rb")
+            try:
+                imgFile = open(realpath,"rb")
+            except:
+                return "file no exist"
             content = imgFile.read()
             mc.set(fileId.encode("utf-8"),content)
         cherrypy.response.headers['Content-Type'] = "image"
         return content
    
     @cherrypy.tools.noBodyProcess()
-    def POST(self, theFile=None):
+    def POST(self,FileId=None):
         cherrypy.response.timeout = 3600
 
+        
         lcHDRS = {}
         for key, val in cherrypy.request.headers.iteritems():
             lcHDRS[key.lower()] = val
@@ -132,14 +157,21 @@ class files(object):
                                     keep_blank_values=True)
 
         theFile = formFields['theFile']
+        FileId = formFields['FileId'].value
+        cherrypy.session[FileId] = (theFile.file.name, cherrypy.request.headers['Content-length']) 
+        cherrypy.session.save() 
         namelist = theFile.filename.split('.')
         suffix = namelist[len(namelist)-1]
         if suffix == '':
             suffix = 'none'
-        
-        uid = uuid.uuid4();
-        stored_path = '/'.join([imgroot,suffix,uid.hex[0:3], uid.hex[4:6], uid.hex[7:9],uid.hex[10:]]);
-        dirname = "/".join([imgroot,suffix,uid.hex[0:3], uid.hex[4:6], uid.hex[7:9]]);
+            
+        if FileId == None:
+            uid = uuid.uuid4();
+            FileId = uid.hex;
+                        
+        stored_path = '/'.join([imgroot,suffix,FileId[0:3], FileId[4:6], FileId[7:9],FileId[10:]]);
+        dirname = "/".join([imgroot,suffix,FileId[0:3], FileId[4:6], FileId[7:9]]);
+            
         if not os.path.exists(dirname):
             os.makedirs(dirname)
         
@@ -151,7 +183,7 @@ class files(object):
         #realfile.write(theFile.file.read());
         os.link(theFile.file.name, realpath)
 
-        return "%s" % uid.hex+'.'+suffix
+        return "%s" % FileId+'.'+suffix
     
 def application(environ, start_response):
     cherrypy.server.max_request_body_size = 0
@@ -159,9 +191,12 @@ def application(environ, start_response):
     restful_conf = {
                     '/': {
                           'request.dispatch':cherrypy.dispatch.MethodDispatcher(),
+                          'tools.sessions.on':True
                          },
     }
-    #cherrypy.tree.mount(files(), '/files', config=restful_conf)
-    cherrypy.tree.mount(fileUpload(), '/', None)
+    cherrypy.tree.mount(files(), '/files', config=restful_conf)
+    cherrypy.tree.mount(fileUpload(), '/', config = {"/": {'tools.sessions.on':True}})
     return cherrypy.tree(environ, start_response)
 
+server = wsgiserver.CherryPyWSGIServer(('localhost', 8000), application)
+server.start()
