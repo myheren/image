@@ -8,7 +8,9 @@ require "securerandom"
 # post
 c = Curl::Easy.new('http://localhost/files/')
 c.multipart_form_post = true
-c.http_post(Curl::PostField.file('theFile', 'files/a.png'),Curl::PostField.content('FileId', SecureRandom.hex))
+c.headers["FileId"] = SecureRandom.hex
+print c.headers["FileId"]
+c.http_post(Curl::PostField.file('theFile', 'files/c.rmvb'))
 
 # print response
 print c.body_str
