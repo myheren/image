@@ -42,20 +42,12 @@ class myFieldStorage(cgi.FieldStorage):
         FileId = cherrypy.request.headers['FileId']
         if uploadFileExist(FileId):
             filePath = FilePath(FileId)
-            tmpfile = open(filePath+".append",'w+b')
+            tmpfile = open(filePath,'ab')
             fileUploading[FileId] = (filePath, int(cherrypy.request.headers['Content-length']))
         else:
             tmpfile = tempfile.NamedTemporaryFile()
             fileUploading[FileId] = (tmpfile.name, int(cherrypy.request.headers['Content-length'])) 
         return tmpfile
-    def __write(self, line):
-        print "hello"
-        if self.__file is not None:
-            if self.__file.tell() + len(line) > 1000:
-                self.file = self.make_file('')
-                self.file.write(self.__file.getvalue())
-                self.__file = None
-        self.file.write(line)
         
     def read_single(self):
         """Modified: Internal: read an atomic part."""
@@ -64,7 +56,8 @@ class myFieldStorage(cgi.FieldStorage):
             if uploadFileExist(FileId):
                 filePath = FilePath(FileId)
                 #self.fp.read(len(self.outerboundary))
-                self.fp.read(os.stat(filePath).st_size-1)
+                print os.stat(filePath).st_size
+                print self.fp.read(os.stat(filePath).st_size)
         if self.length >= 0:
             self.read_binary()
             self.skip_lines()
@@ -160,20 +153,10 @@ class files(object):
         #realfile.write(theFile.file.read());
         if not uploadFileExist(cherrypy.request.headers['FileId']):
             os.link(theFile.file.name, realpath)
-        else:
-            ori = open(realpath, 'rb')
-            oricont = ori.read()
-            ori.close()
-            destination = open(realpath, 'wb')
-            oricont = oricont[:-1]
-            destination.write(oricont)
-            print oricont
-            f= open(realpath+".append", 'rb')
-            c=f.read()
-            f.close()
-            print c
-            destination.write(c)
-            destination.close()
+        #else:
+            #destination = open(realpath, 'ab')
+            #shutil.copyfileobj(open(realpath+".append", 'rb'), destination)
+            #destination.close()
 
         return "%s" % FileId+'.'+suffix
     
