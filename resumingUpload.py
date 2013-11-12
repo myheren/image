@@ -81,10 +81,16 @@ class fileUpload:
         except: # is None or unpack error 
             return 'no such file uploading' 
         else: 
-            try:
+            if os.path.exists(tempfilepath):
                 currsize = os.stat(tempfilepath).st_size 
-            except:
-                return "done"
+            else:
+                FileId = cherrypy.request.headers['FileId']
+                fpath = FilePath(FileId)
+                if os.path.exists(fpath):
+                    currsize = os.stat(fpath).st_size
+                    return "aborted: " + str(float(currsize) / length * 100) + '%' 
+                else:
+                    return "upload failed"
             return str(float(currsize) / length * 100) + '%' 
 
 class files(object):
