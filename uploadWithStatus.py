@@ -76,14 +76,6 @@ def noBodyProcess():
 
 cherrypy.tools.noBodyProcess = cherrypy.Tool('before_request_body', noBodyProcess)
 
-def CORS(): 
-    cherrypy.response.headers["Access-Control-Allow-Origin"] = "*"
-    cherrypy.response.headers['Access-Control-Allow-Methods'] = "GET,PUT,POST,DELETE"
-    cherrypy.response.headers['Access-Control-Allow-Headers'] = "Content-Type, Content-Range, Content-Disposition, Content-Description"
-    #cherrypy.response.headers['Access-Control-Allow-Credentials'] = "true"
-    cherrypy.response.headers['Allow'] = "GET,PUT,POST,DELETE"
-    
-cherrypy.tools.CORS = cherrypy.Tool('before_handler', CORS)
 class fileUpload:    
     
     @cherrypy.expose
@@ -135,59 +127,35 @@ class files(object):
         return content
    
     @cherrypy.tools.noBodyProcess()
-    @cherrypy.tools.CORS()
     def POST(self):
         cherrypy.response.timeout = 3600
-
-        
-        lcHDRS = {}
-        for key, val in cherrypy.request.headers.iteritems():
-            lcHDRS[key.lower()] = val
-            
-        formFields = myFieldStorage(fp=cherrypy.request.rfile,
-                                    headers=lcHDRS,
-                                    environ={'REQUEST_METHOD':'POST'},
-                                    keep_blank_values=True)
-        
-        theFile = formFields['theFile']
         try:
-            FileId = cherrypy.request.headers['FileId'].split(".")[0]
-        except:
-            FileId = None
-        namelist = theFile.filename.split('.')
-        suffix = namelist[len(namelist)-1]
-        if suffix == '':
-            suffix = 'none'
-            
-        if FileId == None:
-            uid = uuid.uuid4();
-            FileId = uid.hex;
-                        
-        stored_path = '/'.join([imgroot,suffix,FileId[0:3], FileId[4:6], FileId[7:9],FileId[10:]]);
-        dirname = "/".join([imgroot,suffix,FileId[0:3], FileId[4:6], FileId[7:9]]);
-            
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-        
-        realpath = stored_path
-        if suffix != 'none':
-            realpath = stored_path+'.'+suffix
-            
-        #realfile = open(realpath,"w+b")
-        #realfile.write(theFile.file.read());
-        try:
-            fullId = cherrypy.request.headers['FileId']
-        except:
-            fullId = ""
-        if not uploadFileExist(fullId):
-            os.link(theFile.file.name, realpath)
-        #else:
-            #destination = open(realpath, 'ab')
-            #shutil.copyfileobj(open(realpath+".append", 'rb'), destination)
-            #destination.close()
+            del cherrypy.file_transfers[cherrypy.request.remote_addr][myfile1.filename]
+        except KeyError:
+            pass
 
-        return "%s" % FileId+'.'+suffix
-        
+        tmpdir = os.path.join(os.getcwd(), "img")
+        if len(myfile1.filename) > 0:
+            self.save_file(os.path.join(tmpdir, os.path.basename(myfile1.filename)), myfile1.file)
+
+        return self.upload(msg="uploaded %s and %s" % (myfile1.filename, myfile2.filename))
+    
+    def upload(self, msg=""):
+        return dict(message=msg)
+    
+    def save_file(self, filepath, file):
+        chunk_size = 8192
+        # return if file is empty
+        if not file:
+            return
+        # create new file on file system
+        savedfile = open(filepath, "wb")
+        # save data to this new file in chunks
+        while True:
+            data = file.read(chunk_size)
+            if not data:
+                break
+            savedfile.write(data)
 def application(environ, start_response):
     cherrypy.server.max_request_body_size = 0
     cherrypy.server.socket_timeout = 60
@@ -201,13 +169,11 @@ def application(environ, start_response):
                          },
     }
     cherrypy.tree.mount(files(), '/files', config=restful_conf)
-#     cherrypy.tree.mount(fileUpload(), '/', config = {"/": {
-#                                                            cherrypy.tools.CORS.on : True,
-#                                                            #'tools.sessions.on':True,
-#                                                            #'tools.sessions.storage_type':"file",
-#                                                            #'tools.sessions.storage_path':"sessions",
-#                                                            #'tools.sessions.timeout': 60
-#                                                            }})
+    cherrypy.tree.mount(fileUpload(), '/', config = {"/": {#'tools.sessions.on':True,
+                                                           #'tools.sessions.storage_type':"file",
+                                                           #'tools.sessions.storage_path':"sessions",
+                                                           #'tools.sessions.timeout': 60
+                                                           }})
     return cherrypy.tree(environ, start_response)
 
 server = wsgiserver.CherryPyWSGIServer(('localhost', 8000), application)
