@@ -8,6 +8,7 @@ import uuid
 import os
 from cherrypy import wsgiserver
 import json
+import shutil
 
 mc = memcache.Client(['127.0.0.1:11211'])
 imgroot = "img"
@@ -104,8 +105,13 @@ class files(object):
         realpath = stored_path
         if suffix != 'none':
             realpath = stored_path+'.'+suffix
-            
-        os.link(theFile.file.name, realpath)
+        
+        if os.path.exists(realpath):
+            destination = open(realpath, 'ab')
+            shutil.copyfileobj(theFile.file, destination)
+            destination.close()
+        else:    
+            os.link(theFile.file.name, realpath)
         try:
             cherrypy.response.headers['location'] = formFields['cb'].value
         except:
