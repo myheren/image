@@ -105,22 +105,37 @@ class files(object):
         realpath = stored_path
         if suffix != 'none':
             realpath = stored_path+'.'+suffix
-        
+        if 'Content-Range' in cherrypy.request.headers:
+            print cherrypy.request.headers['Content-Range']
+            smallersize = int(cherrypy.request.headers['Content-Range'].split('/')[0].split(' ')[1].split('-')[0])
+            bigersize = int(cherrypy.request.headers['Content-Range'].split('/')[0].split('-')[1])
+            noRange = False
+        else:
+            smallersize = 0
+            bigersize = 0 #modify later
+            noRange = True
         if os.path.exists(realpath):
-            destination = open(realpath, 'ab')
-            shutil.copyfileobj(theFile.file, destination)
-            destination.close()
+            if noRange:
+                os.remove(realpath)
+                os.link(theFile.file.name, realpath)
+            else:
+                if bigersize + 1 < os.path.getsize(realpath):
+                    bigersize = os.path.getsize(realpath) - 1
+                else:  
+                    destination = open(realpath, 'ab')
+                    shutil.copyfileobj(theFile.file, destination)
+                    destination.close()
         else:    
             os.link(theFile.file.name, realpath)
+            bigersize = os.path.getsize(realpath) - 1
         try:
             cherrypy.response.headers['location'] = formFields['cb'].value
         except:
             pass
-        if 'Content-Range' in cherrypy.request.headers:
-            print cherrypy.request.headers['Content-Range']
-            cherrypy.response.headers['Range'] = cherrypy.request.headers['Content-Range'].split('/')[0].split(' ')[1]
-        print cherrypy.response.headers
-        dict = {"files":[{"name": FileId+'.'+suffix,"size":int(cherrypy.request.headers['Content-Range'].split('/')[0].split('-')[1]),"type":"image/"+suffix,"url":"","thumbnail_url":""}]}
+        if not noRange:
+            cherrypy.response.headers['Range'] = '0-'+str(bigersize)
+        #print cherrypy.response.headers
+        dict = {"files":[{"name": FileId+'.'+suffix,"size":bigersize,"type":"image/"+suffix,"url":"","thumbnail_url":""}]}
         return json.dumps(dict)
 
 class upload(object):
