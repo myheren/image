@@ -7,69 +7,17 @@ import memcache
 import uuid
 import os
 from cherrypy import wsgiserver
-import shutil
+import json
 
 mc = memcache.Client(['127.0.0.1:11211'])
 imgroot = "img"
-fileUploading = {}
-
-
-def uploadFileExist(FileId):
-    if FileId == None:
-        return False
-    return os.path.exists(FilePath(FileId))
-
-
-def FilePath(FileId):
-    if FileId == None:
-        return ""
-    filenamelists = FileId.split('.')
-    if len(filenamelists) < 1 or len(filenamelists) > 2:
-        return ""
-    if len(filenamelists) == 1:
-        filenamelists.append('none') 
-    filename = filenamelists[0]
-    suffix = filenamelists[1]
-    realpath = '/'.join([imgroot,suffix,filename[0:3], filename[4:6], filename[7:9],filename[10:]])
-    if suffix != 'none':
-        realpath = realpath+'.'+suffix
-    return realpath
 
 class myFieldStorage(cgi.FieldStorage):
     
     def make_file(self, binary=None):
-        tmpfile = None
-        try:
-            FileId = cherrypy.request.headers['FileId']
-        except:
-            FileId = ""
-        if uploadFileExist(FileId):
-            filePath = FilePath(FileId)
-            tmpfile = open(filePath,'ab')
-            fileUploading[FileId] = (filePath, int(cherrypy.request.headers['Content-length']))
-        else:
-            tmpfile = tempfile.NamedTemporaryFile()
-            fileUploading[FileId] = (tmpfile.name, int(cherrypy.request.headers['Content-length'])) 
+
+        tmpfile = tempfile.NamedTemporaryFile() 
         return tmpfile
-        
-    def read_single(self):
-        """Modified: Internal: read an atomic part."""
-        if(self.name == "theFile"):
-            try:
-                FileId = cherrypy.request.headers['FileId']
-            except:
-                FileId = ""
-            if uploadFileExist(FileId):
-                filePath = FilePath(FileId)
-                #self.fp.read(len(self.outerboundary))
-                print os.stat(filePath).st_size
-                print self.fp.read(os.stat(filePath).st_size)
-        if self.length >= 0:
-            self.read_binary()
-            self.skip_lines()
-        else:
-            self.read_lines()
-        self.file.seek(0)
         
 def noBodyProcess():
     cherrypy.request.process_request_body = False
@@ -78,37 +26,21 @@ cherrypy.tools.noBodyProcess = cherrypy.Tool('before_request_body', noBodyProces
 
 def CORS(): 
     cherrypy.response.headers["Access-Control-Allow-Origin"] = "*"
-    cherrypy.response.headers['Access-Control-Allow-Methods'] = "GET,PUT,POST,DELETE"
+    cherrypy.response.headers['Access-Control-Allow-Methods'] = "GET,PUT,POST,DELETE,OPTIONS"
     cherrypy.response.headers['Access-Control-Allow-Headers'] = "Content-Type, Content-Range, Content-Disposition, Content-Description"
     #cherrypy.response.headers['Access-Control-Allow-Credentials'] = "true"
     cherrypy.response.headers['Allow'] = "GET,PUT,POST,DELETE"
     
 cherrypy.tools.CORS = cherrypy.Tool('before_handler', CORS)
-class fileUpload:    
-    
-    @cherrypy.expose
-    def uploadingStatus(self, fid=None): 
-        if fid == None:
-            return "no file id"
-        try: 
-            tempfilepath, length = fileUploading[fid] 
-        except: # is None or unpack error 
-            return 'no such file uploading' 
-        else: 
-            if os.path.exists(tempfilepath):
-                currsize = os.stat(tempfilepath).st_size 
-            else:
-                FileId = cherrypy.request.headers['FileId']
-                fpath = FilePath(FileId)
-                if os.path.exists(fpath):
-                    currsize = os.stat(fpath).st_size
-                    return "aborted: " + str(float(currsize) / length * 100) + '%' 
-                else:
-                    return "upload failed"
-            return str(float(currsize) / length * 100) + '%' 
 
 class files(object):
     exposed = True
+    
+    @cherrypy.tools.CORS()
+    def OPTIONS(self):
+        return ''
+    
+    @cherrypy.tools.CORS()
     def GET(self,fileId=None):
         if fileId == None:
             return "no file id"
@@ -151,7 +83,7 @@ class files(object):
         
         theFile = formFields['theFile']
         try:
-            FileId = cherrypy.request.headers['FileId'].split(".")[0]
+            FileId = formFields['FileId'].value
         except:
             FileId = None
         namelist = theFile.filename.split('.')
@@ -163,8 +95,8 @@ class files(object):
             uid = uuid.uuid4();
             FileId = uid.hex;
                         
-        stored_path = '/'.join([imgroot,suffix,FileId[0:3], FileId[4:6], FileId[7:9],FileId[10:]]);
-        dirname = "/".join([imgroot,suffix,FileId[0:3], FileId[4:6], FileId[7:9]]);
+        stored_path = '/'.join([imgroot,suffix,FileId[0:3], FileId[3:6], FileId[6:9],FileId[9:]]);
+        dirname = "/".join([imgroot,suffix,FileId[0:3], FileId[3:6], FileId[6:9]]);
             
         if not os.path.exists(dirname):
             os.makedirs(dirname)
@@ -173,21 +105,22 @@ class files(object):
         if suffix != 'none':
             realpath = stored_path+'.'+suffix
             
-        #realfile = open(realpath,"w+b")
-        #realfile.write(theFile.file.read());
+        os.link(theFile.file.name, realpath)
         try:
-            fullId = cherrypy.request.headers['FileId']
+            cherrypy.response.headers['location'] = formFields['cb'].value
         except:
-            fullId = ""
-        if not uploadFileExist(fullId):
-            os.link(theFile.file.name, realpath)
-        #else:
-            #destination = open(realpath, 'ab')
-            #shutil.copyfileobj(open(realpath+".append", 'rb'), destination)
-            #destination.close()
+            pass
+        if 'Content-Range' in cherrypy.request.headers:
+            print cherrypy.request.headers['Content-Range']
+            cherrypy.response.headers['Range'] = cherrypy.request.headers['Content-Range'].split('/')[0].split(' ')[1]
+        print cherrypy.response.headers
+        dict = {"files":[{"name": FileId+'.'+suffix,"size":int(cherrypy.request.headers['Content-Range'].split('/')[0].split('-')[1]),"type":"image/"+suffix,"url":"","thumbnail_url":""}]}
+        return json.dumps(dict)
 
-        return "%s" % FileId+'.'+suffix
-        
+class upload(object):
+    @cherrypy.expose
+    def index(self):
+        return "<div id='hi'>hello</div>"        
 def application(environ, start_response):
     cherrypy.server.max_request_body_size = 0
     cherrypy.server.socket_timeout = 60
@@ -201,14 +134,8 @@ def application(environ, start_response):
                          },
     }
     cherrypy.tree.mount(files(), '/files', config=restful_conf)
-#     cherrypy.tree.mount(fileUpload(), '/', config = {"/": {
-#                                                            cherrypy.tools.CORS.on : True,
-#                                                            #'tools.sessions.on':True,
-#                                                            #'tools.sessions.storage_type':"file",
-#                                                            #'tools.sessions.storage_path':"sessions",
-#                                                            #'tools.sessions.timeout': 60
-#                                                            }})
+    #cherrypy.tree.mount(upload(), '/', None)
     return cherrypy.tree(environ, start_response)
 
-server = wsgiserver.CherryPyWSGIServer(('localhost', 8000), application)
+server = wsgiserver.CherryPyWSGIServer(('0.0.0.0', 8000), application)
 server.start()
