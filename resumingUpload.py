@@ -119,7 +119,7 @@ class files(object):
                 os.remove(realpath)
                 os.link(theFile.file.name, realpath)
             else:
-                if bigersize + 1 < os.path.getsize(realpath):
+                if bigersize + 1 <= os.path.getsize(realpath):
                     bigersize = os.path.getsize(realpath) - 1
                 else:  
                     destination = open(realpath, 'ab')
