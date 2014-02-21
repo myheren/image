@@ -9,6 +9,7 @@ import os
 from cherrypy import wsgiserver
 import json
 import shutil
+import md5
 
 mc = memcache.Client(['127.0.0.1:11211'])
 imgroot = "img"
@@ -48,11 +49,15 @@ class files(object):
         #mc.set("hello","world")
         #print mc.get("hello")
         filenamelists = fileId.split('.')
-        if len(filenamelists) != 2:
+        if len(filenamelists) > 2:
             return "invalid file id"
+        suffix = ''
+        if len(filenamelists) == 1:
+            suffix = 'none'
+        else:
+            suffix = filenamelists[1]
         filename = filenamelists[0]
-        suffix = filenamelists[1]
-        realpath = '/'.join([imgroot,suffix,filename[0:3], filename[4:6], filename[7:9],filename[10:]])
+        realpath = '/'.join([imgroot,suffix,filename[1:3], filename[4:6], filename[7:9],filename[10:]])
         if suffix != 'none':
             realpath = realpath+'.'+suffix
         
@@ -77,7 +82,7 @@ class files(object):
         for key, val in cherrypy.request.headers.iteritems():
             lcHDRS[key.lower()] = val
             
-        formFields = myFieldStorage(fp=cherrypy.request.rfile,
+        formFields = cgi.FieldStorage(fp=cherrypy.request.rfile,
                                     headers=lcHDRS,
                                     environ={'REQUEST_METHOD':'POST'},
                                     keep_blank_values=True)
@@ -96,8 +101,8 @@ class files(object):
             uid = uuid.uuid4();
             FileId = uid.hex;
                         
-        stored_path = '/'.join([imgroot,suffix,FileId[0:3], FileId[3:6], FileId[6:9],FileId[9:]]);
-        dirname = "/".join([imgroot,suffix,FileId[0:3], FileId[3:6], FileId[6:9]]);
+        stored_path = '/'.join([imgroot,suffix,FileId[1:3], FileId[4:6], FileId[7:9],FileId[10:]]);
+        dirname = "/".join([imgroot,suffix,FileId[1:3], FileId[4:6], FileId[7:9]]);
             
         if not os.path.exists(dirname):
             os.makedirs(dirname)
@@ -117,16 +122,26 @@ class files(object):
         if os.path.exists(realpath):
             if noRange:
                 os.remove(realpath)
-                os.link(theFile.file.name, realpath)
+                destination = open(realpath, 'w+')
+                shutil.copyfileobj(theFile.file, destination)
+                destination.close()
             else:
-                if bigersize + 1 <= os.path.getsize(realpath):
-                    bigersize = os.path.getsize(realpath) - 1
-                else:  
-                    destination = open(realpath, 'ab')
+                if smallersize == 0:
+                    os.remove(realpath)
+                    destination = open(realpath, 'w+')
                     shutil.copyfileobj(theFile.file, destination)
                     destination.close()
+                else: 
+                    if bigersize + 1 <= os.path.getsize(realpath):
+                        bigersize = os.path.getsize(realpath) - 1
+                    else:  
+                        destination = open(realpath, 'ab')
+                        shutil.copyfileobj(theFile.file, destination)
+                        destination.close()
         else:    
-            os.link(theFile.file.name, realpath)
+            destination = open(realpath, 'w+')
+            shutil.copyfileobj(theFile.file, destination)
+            destination.close()
             bigersize = os.path.getsize(realpath) - 1
         try:
             cherrypy.response.headers['location'] = formFields['cb'].value
@@ -135,9 +150,33 @@ class files(object):
         if not noRange:
             cherrypy.response.headers['Range'] = '0-'+str(bigersize)
         #print cherrypy.response.headers
-        dict = {"files":[{"name": FileId+'.'+suffix,"size":bigersize,"type":"image/"+suffix,"url":"","thumbnail_url":""}]}
+        dict = {"success":True,"files":[{"name": FileId+'.'+suffix,"size":bigersize,"type":"image/"+suffix,"url":"","thumbnail_url":""}]}
         return json.dumps(dict)
 
+class status(object):
+    exposed = True
+    
+    def GET(self,fileId=None):
+        if fileId == None:
+            return ''
+        filenamelists = fileId.split('.')
+        if len(filenamelists) > 2:
+            return ''
+        suffix = ''
+        if len(filenamelists) == 1:
+            suffix = 'none'
+        else:
+            suffix = filenamelists[1]
+        filename = filenamelists[0]
+        realpath = '/'.join([imgroot,suffix,filename[1:3], filename[4:6], filename[7:9],filename[10:]])
+        if suffix != 'none':
+            realpath = realpath+'.'+suffix
+        if os.path.exists(realpath):
+            imgFile = open(realpath,"rb")
+            content = imgFile.read()
+            return md5.new(content).hexdigest()
+        else:
+            return ''
 class upload(object):
     @cherrypy.expose
     def index(self):
@@ -156,6 +195,7 @@ def application(environ, start_response):
     }
     cherrypy.tree.mount(files(), '/files', config=restful_conf)
     #cherrypy.tree.mount(upload(), '/', None)
+    cherrypy.tree.mount(status(), '/status', config=restful_conf)
     return cherrypy.tree(environ, start_response)
 
 server = wsgiserver.CherryPyWSGIServer(('0.0.0.0', 8000), application)

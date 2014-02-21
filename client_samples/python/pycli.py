@@ -11,7 +11,8 @@ opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookies),
 
 #this is for test
 
-opener.addheaders = [('FileId', "testtesttesttesttesttest.png")]
+opener.addheaders = [('FileId', "testtesttesttesttesttest")]
 
-params = {"theFile" : open("files/a.png", "rb") }
+params = {"theFile" : open("files/a.png", "rb"),
+          'FileId': "testtesttesttesttesttest" }
 print opener.open("http://localhost/files/", params).read()
